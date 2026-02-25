@@ -1,9 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:info_wifi/features/graph_cart.dart';
-import 'package:wifi_scan/wifi_scan.dart';
+import 'package:flutter_wifi_collision_detection/page/access_point_chart_activity_page.dart';
+import 'package:flutter_wifi_collision_detection/page/access_point_page.dart';
+import 'package:flutter_wifi_collision_detection/viewmodel/radio_wifi_view_model.dart';
+import 'package:provider/provider.dart';
 
 void main() {
-  runApp(const MainApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => RadioWifiViewModel()),
+      ],
+      child: const MainApp()
+    )
+  );
 }
 
 class MainApp extends StatefulWidget {
@@ -14,105 +23,35 @@ class MainApp extends StatefulWidget {
 }
 
 class _MainAppState extends State<MainApp> {
-  bool isLoading = false;
-  List<WiFiAccessPoint> accessPoints = [];
+  int _selectedIndex = 0;
 
-  @override
-  void initState() {
-    super.initState();
-  }
+  final List<Widget> _screen = [
+    AccessPointChartActivityPage(),
+    AccessPointPage()
+  ];
 
-  void _startScan() async {
+  void _onBottomNavigationBarItemTapped(int index) {
     setState(() {
-      isLoading = true;
-    });
-    final can = await WiFiScan.instance.canStartScan(askPermissions: true);
-    switch (can) {
-      case CanStartScan.yes:
-        final isScanning = await WiFiScan.instance.startScan();
-        if (isScanning) {
-          _getScannedResults();
-        }
-        break;
-      case CanStartScan.notSupported:
-        print("Not supported !");
-      case CanStartScan.noLocationPermissionRequired:
-        print("Location noLocationPermissionRequired !");
-      case CanStartScan.noLocationPermissionDenied:
-        print("Location noLocationPermissionDenied !");
-      case CanStartScan.noLocationPermissionUpgradeAccuracy:
-        print("Location noLocationPermissionUpgradeAccuracy !");
-      case CanStartScan.noLocationServiceDisabled:
-        print("Location noLocationServiceDisabled !");
-      case CanStartScan.failed:
-        print("Location failed !");
-    }
-
-    setState(() {
-      isLoading = false;
-    });
-  }
-
-  void _getScannedResults() async {
-    final can = await WiFiScan.instance.canGetScannedResults(
-      askPermissions: true,
-    );
-    switch (can) {
-      case CanGetScannedResults.yes:
-        accessPoints = await WiFiScan.instance.getScannedResults();
-        break;
-      case CanGetScannedResults.notSupported:
-        print("Not supported !");
-      case CanGetScannedResults.noLocationPermissionRequired:
-        print("Location noLocationPermissionRequired !");
-      case CanGetScannedResults.noLocationPermissionDenied:
-        print("Location noLocationPermissionDenied !");
-      case CanGetScannedResults.noLocationPermissionUpgradeAccuracy:
-        print("Location noLocationPermissionUpgradeAccuracy !");
-      case CanGetScannedResults.noLocationServiceDisabled:
-        print("Location noLocationServiceDisabled !");
-    }
-
-    setState(() {
-      isLoading = false;
+      _selectedIndex = index;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       home: Scaffold(
-        body: SafeArea(
-          child: isLoading
-              ? Center(child: CircularProgressIndicator())
-              : Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          TextButton(
-                            onPressed: () {
-                              _startScan();
-                            },
-                            child: const Text("Scan WIFI"),
-                          ),
-                        ],
-                      ),
-                      if (accessPoints.isEmpty) Center(child: Text("....")),
-                      if (accessPoints.isNotEmpty)
-                        Expanded(
-                          child: GraphCart(accessPointDatas: accessPoints),
-                        ),
-                    ],
-                  ),
-                ),
+        body: _screen[_selectedIndex],
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: _onBottomNavigationBarItemTapped,
+          items: [
+            BottomNavigationBarItem(label: "Activity", icon: Icon(Icons.accessibility)),
+            BottomNavigationBarItem(label: "Access Points", icon: Icon(Icons.info))
+          ],
         ),
-      ),
+
+      )
     );
   }
 }

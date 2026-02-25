@@ -1,5 +1,5 @@
-name: info_wifi
-description: "A new Flutter project."
+name: flutter_wifi_collision_detection
+description: "a Flutter project for detecting WiFi collisions."
 publish_to: "none"
 version: 0.1.0
 
@@ -10,8 +10,10 @@ dependencies:
   flutter:
     sdk: flutter
   intl: ^0.20.2
-  syncfusion_flutter_charts: ^31.1.18
   wifi_scan: ^0.4.1+2
+  fl_chart: ^1.1.1
+  provider: ^6.1.5+1
+  uuid: ^4.5.3
 
 dev_dependencies:
   flutter_test:
