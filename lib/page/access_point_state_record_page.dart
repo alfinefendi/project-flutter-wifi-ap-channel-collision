@@ -1,14 +1,12 @@
+import 'package:cristalyse/cristalyse.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_wifi_collision_detection/model/access_point_state_record_model.dart';
-import 'package:flutter_wifi_collision_detection/util/helper.dart';
 import 'package:flutter_wifi_collision_detection/viewmodel/radio_wifi_view_model.dart';
 import 'package:provider/provider.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:wifi_scan/wifi_scan.dart';
 
 class AccessPointStateRecordPage extends StatefulWidget {
-  final WiFiAccessPoint ap;
-
-  const AccessPointStateRecordPage({super.key, required this.ap});
+  const AccessPointStateRecordPage({super.key});
 
   @override
   State<AccessPointStateRecordPage> createState() =>
@@ -27,90 +25,105 @@ class _AccessPointStateRecordPageState
     super.dispose();
   }
 
-  final List<AccessPointStateRecordModel> rows = [];
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Recording')),
-      body: SafeArea(
-        child: buildStreamBuilder(context)
-      ),
-      // floatingActionButton: FloatingActionButton(
-      //   child: Icon(Icons.play_arrow),
-      //   onPressed: () {},
-      // ),
-    );
-  }
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        // logic kamu di sini sebelum keluar
 
-  StreamBuilder<WiFiAccessPoint?> buildStreamBuilder(BuildContext context) {
-    return StreamBuilder<WiFiAccessPoint?>(
-      stream: context.read<RadioWifiViewModel>().streamByBssid(widget.ap.bssid),
-      builder: (context, snapshot) {
-        late bool connected;
-
-        if (snapshot.hasError) {
+        final viewModel = context.read<RadioWifiViewModel>();
+        if (!viewModel.isStartToRecording) {
           Navigator.of(context).pop();
         }
-
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
-        }
-
-        if (!snapshot.hasData) {
-          connected = false;
-        } else {
-          connected = true;
-        }
-
-        final uuid = generateUuid();
-
-        rows.add(
-          AccessPointStateRecordModel(
-            uuid: uuid,
-            connectionStatus: connected
-                ? EnumApConnectionStatus.connected
-                : EnumApConnectionStatus.disconnected,
-            ssid: widget.ap.ssid,
-            bssid: widget.ap.bssid,
-            frequency: snapshot.data?.frequency,
-            channel: calculateFreqChannel(snapshot.data?.frequency),
-            level: snapshot.data?.level,
-            standard: snapshot.data?.standard.toString(),
-            timestamp: DateTime.now(),
-          ),
-        );
-
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            columns: const [
-              DataColumn(label: Text('ID')),
-              DataColumn(label: Text('Status')),
-              DataColumn(label: Text('SSID')),
-              DataColumn(label: Text('BSSID')),
-              DataColumn(label: Text('Channel')),
-              DataColumn(label: Text('Frequency')),
-              DataColumn(label: Text('Level')),
-              DataColumn(label: Text('Timestamp')),
-            ],
-            rows: rows.asMap().entries.map((entry) {
-              return DataRow(
-                cells: [
-                  DataCell(Text("${entry.key + 1}")),
-                  DataCell(Text(entry.value.connectionStatus.name)),
-                  DataCell(Text(entry.value.ssid)),
-                  DataCell(Text(entry.value.bssid)),
-                  DataCell(Text("${entry.value.channel ?? 'N/A'}")),
-                  DataCell(Text("${entry.value.frequency ?? 'N/A'}")),
-                  DataCell(Text("${entry.value.level ?? 'N/A'}")),
-                  DataCell(Text("${entry.value.timestamp}")),
-                ],
-              );
-            }).toList(),
-          ),
-        );
+        viewModel.stopRecording();
       },
+      child: ShadApp(
+        home: Consumer<RadioWifiViewModel>(
+          builder: (context, viewModel, _) {
+            return Scaffold(
+              appBar: AppBar(
+                title: Text(
+                  'Akses Poin Terpilih',
+                  style: ShadTheme.of(context).textTheme.h4,
+                ),
+              ),
+              body: SafeArea(
+                child: viewModel.isStartToRecording
+                    ? StreamBuilder<List<WiFiAccessPoint>>(
+                        stream: viewModel.getStreamByBssid(),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                            // Tambah data baru ke list
+                            viewModel.recordApState(snapshot.data!);
+                          }
+
+                          if (viewModel.recordedData.isEmpty) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+
+                          // Chart akan re-render + animate setiap setState dipanggil
+                          return CristalyseChart()
+                              .data(viewModel.recordedData)
+                              .mapping(x: 'time', y: 'rssi', color: 'ssid')
+                              .geomLine(strokeWidth: 1.0)
+                              .scaleXContinuous()
+                              .scaleYContinuous(min: -100, max: 0)
+                              .theme(ChartTheme.defaultTheme())
+                              .build();
+                        },
+                      )
+                    : ShadTable.list(
+                        header: const [
+                          ShadTableCell.header(child: Text('SSID')),
+                          ShadTableCell.header(child: Text('BSSID')),
+                        ],
+                        columnSpanExtent: (index) {
+                          if (index == 0)
+                            return const FixedTableSpanExtent(220);
+                          if (index == 1) {
+                            return const MaxTableSpanExtent(
+                              FixedTableSpanExtent(120),
+                              RemainingTableSpanExtent(),
+                            );
+                          }
+                          return null;
+                        },
+                        children: viewModel.selectedAp.map(
+                          (ap) => [
+                            ShadTableCell(
+                              child: Text(
+                                ap.ssid,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            ShadTableCell(child: Text(ap.bssid)),
+                          ],
+                        ),
+                      ),
+              ),
+              // Hanya FAB yang butuh isScanning
+              floatingActionButton: Consumer<RadioWifiViewModel>(
+                builder: (context, viewModel, _) {
+                  return FloatingActionButton(
+                    onPressed: viewModel.toggleStartRecording,
+                    child: Icon(
+                      viewModel.isStartToRecording
+                          ? Icons.stop
+                          : Icons.play_arrow,
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 }

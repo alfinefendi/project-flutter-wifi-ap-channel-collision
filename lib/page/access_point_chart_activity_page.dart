@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_wifi_collision_detection/util/helper.dart';
 import 'package:flutter_wifi_collision_detection/viewmodel/radio_wifi_view_model.dart';
 import 'package:provider/provider.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:wifi_scan/wifi_scan.dart';
 
 class AccessPointChartActivityPage extends StatefulWidget {
@@ -30,18 +31,22 @@ class _AccessPointChartActivityPageState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Activity')),
-      body: SafeArea(
-        child: StreamBuilder<List<WiFiAccessPoint>>(
-          stream: context.read<RadioWifiViewModel>().stream,
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return Center(child: const CircularProgressIndicator());
-            }
+    return ShadApp(
+      home: Scaffold(
+        appBar: AppBar(
+          title: Text('Grafik', style: ShadTheme.of(context).textTheme.h3),
+        ),
+        body: SafeArea(
+          child: StreamBuilder<List<WiFiAccessPoint>>(
+            stream: context.read<RadioWifiViewModel>().stream,
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return Center(child: const CircularProgressIndicator());
+              }
 
-            return buildLineChart(snapshot.data!);
-          },
+              return buildLineChart(snapshot.data!);
+            },
+          ),
         ),
       ),
     );

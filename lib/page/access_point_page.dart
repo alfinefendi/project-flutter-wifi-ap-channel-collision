@@ -3,6 +3,7 @@ import 'package:flutter_wifi_collision_detection/page/access_point_state_record_
 import 'package:flutter_wifi_collision_detection/util/helper.dart';
 import 'package:flutter_wifi_collision_detection/viewmodel/radio_wifi_view_model.dart';
 import 'package:provider/provider.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:wifi_scan/wifi_scan.dart';
 
 class AccessPointPage extends StatelessWidget {
@@ -10,94 +11,127 @@ class AccessPointPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Access Points'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.search),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) {
-                  return AlertDialog(
-                    title: Text('Search Wifi'),
-                    content: TextField(
-                      decoration: InputDecoration(
-                        hintText: 'Enter SSID',
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        // if (didPop) return;
+        // // logic kamu di sini sebelum keluar
+
+        // final viewModel = context.read<RadioWifiViewModel>();
+        // if (!viewModel.isStartToRecording) {
+        //   Navigator.of(context).pop();
+        // }
+        // viewModel.stopRecording();
+      },
+      child: ShadApp(
+        home: Consumer<RadioWifiViewModel>(
+          builder: (context, viewModel, _) {
+            bool isSelectedApNotEmpty = viewModel.selectedAp.isNotEmpty;
+            bool inChecklistMode = viewModel.isInChecklistMode;
+
+            return Scaffold(
+              appBar: AppBar(
+                title: Text(
+                  'Akses Poin',
+                  style: ShadTheme.of(context).textTheme.h3,
+                ),
+                leading: isSelectedApNotEmpty && inChecklistMode
+                    ? IconButton(
+                        icon: Icon(
+                          isSelectedApNotEmpty ? LucideIcons.trash : null,
+                        ),
+                        onPressed: () {
+                          viewModel.toggleChecklistMode();
+                          viewModel.clearSelectedAp();
+                        },
+                      )
+                    : null,
+                actions: [
+                  IconButton(
+                    icon: Badge(
+                      isLabelVisible: isSelectedApNotEmpty && !inChecklistMode
+                          ? true
+                          : false,
+                      label: Text(viewModel.selectedAp.length.toString()),
+                      child: Icon(
+                        inChecklistMode
+                            ? LucideIcons.listX
+                            : LucideIcons.listCheck,
                       ),
                     ),
-                    actions: [
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                        },
-                        child: Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                        },
-                        child: Text('Search'),
-                      ),
-                    ],
-                  );
-                },
-              );
-            },
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: StreamBuilder<List<WiFiAccessPoint>>(
-          stream: context.read<RadioWifiViewModel>().stream,
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return Center(child: const CircularProgressIndicator());
-            }
+                    onPressed: () {
+                      viewModel.toggleChecklistMode();
+                    },
+                  ),
+                ],
+              ),
+              body: SafeArea(
+                child: StreamBuilder<List<WiFiAccessPoint>>(
+                  stream: viewModel.stream,
+                  builder: (context, snapshot) {
+                    // Handle semua state
 
-            return ListView.builder(
-              itemCount: snapshot.data!.length,
-              itemBuilder: (context, index) {
+                    if (snapshot.connectionState == ConnectionState.waiting ||
+                        !snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-                final ap = snapshot.data![index];
+                    if (snapshot.hasError) {
+                      return Center(child: Text('Error: ${snapshot.error}'));
+                    }
 
-                return ListTile(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => AccessPointStateRecordPage(
-                          ap: ap,
-                        ),
-                      ),
+                    if (!snapshot.hasData) {
+                      return const Center(
+                        child: Text('Tidak ada WiFi terdeteksi'),
+                      );
+                    }
+
+                    return ListView.builder(
+                      itemCount: snapshot.data!.length,
+                      itemBuilder: (context, index) {
+                        final ap = snapshot.data![index];
+                        final isChecked = viewModel.validateSeletedAp(ap.bssid);
+
+                        return ListTile(
+                          onTap: () {
+                            inChecklistMode ? viewModel.checklist(ap) : null;
+                          },
+                          onLongPress: () {
+                            if (!inChecklistMode) {
+                              viewModel.toggleChecklistMode();
+                              !isChecked ? viewModel.checklist(ap) : null;
+                            }
+                          },
+                          leading: inChecklistMode
+                              ? Checkbox(
+                                  value: isChecked, // ✅ bukan null
+                                  onChanged: (_) => viewModel.checklist(ap),
+                                )
+                              : null,
+                          title: Text(ap.ssid),
+                          subtitle: Text(ap.bssid),
+                          trailing: Text(
+                            "Channel: ${calculateFreqChannel(ap.frequency)}",
+                          ),
+                        );
+                      },
                     );
                   },
-                  title: Text(ap.ssid),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      Text(ap.bssid),
-                      Text("Frequency: ${ap.frequency}"),
-                      Text(
-                        "Channel: ${calculateFreqChannel(ap.frequency)}",
-                      ),
-                      Text(
-                        "Operator Name: ${ap.operatorFriendlyName}",
-                      ),
-                      Text("cf0: ${ap.centerFrequency0 ?? '-'}"),
-                      Text("cf1: ${ap.centerFrequency1 ?? '-'}"),
-                      Text("Standard: ${ap.standard}"),
-                      Text("Channel Width: ${ap.channelWidth ?? '-'}"),
-                      Text("Capabilities: ${ap.capabilities}"),
-                      Text("Level: ${ap.level}"),
-                      Text("Passpoint: ${ap.isPasspoint}"),
-                      Text("Venue Name: ${ap.venueName}"),
-                    ],
-                  ),
-                );
-              },
+                ),
+              ),
+              floatingActionButton: isSelectedApNotEmpty
+                  ? FloatingActionButton(
+                      child: Icon(LucideIcons.arrowRight),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AccessPointStateRecordPage(),
+                          ),
+                        );
+                      },
+                    )
+                  : null,
             );
           },
         ),

@@ -3,15 +3,14 @@ import 'package:flutter_wifi_collision_detection/page/access_point_chart_activit
 import 'package:flutter_wifi_collision_detection/page/access_point_page.dart';
 import 'package:flutter_wifi_collision_detection/viewmodel/radio_wifi_view_model.dart';
 import 'package:provider/provider.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 void main() {
   runApp(
     MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => RadioWifiViewModel()),
-      ],
-      child: const MainApp()
-    )
+      providers: [ChangeNotifierProvider(create: (_) => RadioWifiViewModel())],
+      child: const MainApp(),
+    ),
   );
 }
 
@@ -27,7 +26,7 @@ class _MainAppState extends State<MainApp> {
 
   final List<Widget> _screen = [
     AccessPointChartActivityPage(),
-    AccessPointPage()
+    AccessPointPage(),
   ];
 
   void _onBottomNavigationBarItemTapped(int index) {
@@ -38,20 +37,37 @@ class _MainAppState extends State<MainApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        body: _screen[_selectedIndex],
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: _onBottomNavigationBarItemTapped,
-          items: [
-            BottomNavigationBarItem(label: "Activity", icon: Icon(Icons.accessibility)),
-            BottomNavigationBarItem(label: "Access Points", icon: Icon(Icons.info))
-          ],
-        ),
-
-      )
+    return ShadApp.custom(
+      themeMode: ThemeMode.light,
+      darkTheme: ShadThemeData(
+        brightness: Brightness.dark,
+        colorScheme: const ShadSlateColorScheme.dark(),
+      ),
+      appBuilder: (BuildContext context) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          builder: (context, child) {
+            return ShadAppBuilder(child: child!);
+          },
+          home: Scaffold(
+            body: _screen[_selectedIndex],
+            bottomNavigationBar: BottomNavigationBar(
+              currentIndex: _selectedIndex,
+              onTap: _onBottomNavigationBarItemTapped,
+              items: [
+                BottomNavigationBarItem(
+                  label: "Grafik",
+                  icon: Icon(LucideIcons.monitor),
+                ),
+                BottomNavigationBarItem(
+                  label: "Akses Poin",
+                  icon: Icon(LucideIcons.wifiHigh),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
